@@ -7,15 +7,6 @@ import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
-const CREDIT_COSTS: Record<string, number> = {
-  train_online: 200,
-  train_device: 0,
-  swap_video_small: 100,
-  swap_video_medium: 300,
-  swap_video_large: 600,
-  swap_image: 50,
-};
-
 const VIDEO_LIMITS: Record<string, { maxSeconds: number; label: string }> = {
   swap_video_small: { maxSeconds: 10, label: "first 10 seconds" },
   swap_video_medium: { maxSeconds: 90, label: "first 90 seconds" },
@@ -40,8 +31,7 @@ const CreateJobBody = z.object({
 
 router.get("/jobs", async (req, res) => {
   const { status, type } = req.query;
-  let query = db.select().from(jobsTable).orderBy(desc(jobsTable.createdAt));
-  const jobs = await query;
+  const jobs = await db.select().from(jobsTable).orderBy(desc(jobsTable.createdAt));
   let filtered = jobs;
   if (status) filtered = filtered.filter((j) => j.status === status);
   if (type) filtered = filtered.filter((j) => j.type === type);
@@ -82,13 +72,10 @@ router.post("/jobs", async (req, res) => {
     body.data.type !== "swap_image" &&
     !body.data.inputStorageKey
   ) {
-    res
-      .status(400)
-      .json({ error: "inputStorageKey is required for video swap jobs" });
+    res.status(400).json({ error: "inputStorageKey is required for video swap jobs" });
     return;
   }
 
-  const creditsUsed = CREDIT_COSTS[body.data.type] ?? 0;
   const jobSize =
     body.data.size ??
     (body.data.type === "swap_video_small"
@@ -110,11 +97,10 @@ router.post("/jobs", async (req, res) => {
       inputStorageKey: body.data.inputStorageKey ?? null,
       size: jobSize ?? null,
       iterations: body.data.iterations ?? null,
-      creditsUsed,
     })
     .returning();
 
-  res.status(201).json({ job, creditsUsed, videoLimit: VIDEO_LIMITS[body.data.type] ?? null });
+  res.status(201).json({ job, videoLimit: VIDEO_LIMITS[body.data.type] ?? null });
 });
 
 router.get("/jobs/:id", async (req, res) => {
@@ -166,19 +152,12 @@ router.post("/jobs/:id/cancel", async (req, res) => {
     res.status(409).json({ error: `Job is already ${job.status}` });
     return;
   }
-  const refundCredits = job.status === "queued" || job.status === "draft";
   const [updated] = await db
     .update(jobsTable)
     .set({ status: "cancelled", updatedAt: new Date() })
     .where(eq(jobsTable.id, req.params.id))
     .returning();
-  res.json({
-    job: updated,
-    creditsRefunded: refundCredits ? job.creditsUsed : 0,
-    message: refundCredits
-      ? `Job cancelled and ${job.creditsUsed} credits refunded`
-      : "Job cancelled",
-  });
+  res.json({ job: updated, message: "Job cancelled" });
 });
 
 router.delete("/jobs/:id", async (req, res) => {
@@ -190,13 +169,8 @@ router.delete("/jobs/:id", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-  const refundCredits =
-    job.status === "queued" || job.status === "draft";
   await db.delete(jobsTable).where(eq(jobsTable.id, req.params.id));
-  res.json({
-    success: true,
-    creditsRefunded: refundCredits ? job.creditsUsed : 0,
-  });
+  res.json({ success: true });
 });
 
 router.patch("/jobs/:id/progress", async (req, res) => {

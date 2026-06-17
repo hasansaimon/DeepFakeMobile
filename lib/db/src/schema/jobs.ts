@@ -40,7 +40,6 @@ export const jobsTable = pgTable("jobs", {
   iterations: integer("iterations"),
   progressPercent: integer("progress_percent").notNull().default(0),
   errorMessage: text("error_message"),
-  creditsUsed: integer("credits_used").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
