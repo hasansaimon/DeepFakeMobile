@@ -14,3 +14,30 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Request body for obtaining a presigned upload URL
+ * @summary Request upload URL
+ */
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string().min(1),
+  size: zod.number().int().positive(),
+  contentType: zod.string().min(1),
+});
+
+/**
+ * Response containing the presigned upload URL and object path
+ * @summary Request upload URL response
+ */
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string().url(),
+  objectPath: zod.string().min(1),
+  metadata: zod.object({
+    name: zod.string(),
+    size: zod.number(),
+    contentType: zod.string(),
+  }),
+});
+
+export type RequestUploadUrlBodyType = zod.infer<typeof RequestUploadUrlBody>;
+export type RequestUploadUrlResponseType = zod.infer<typeof RequestUploadUrlResponse>;
