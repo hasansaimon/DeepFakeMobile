@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: facesets
+    description: Faceset management
+  - name: models
+    description: Face model training
+  - name: jobs
+    description: Face swap / upscale jobs
+  - name: storage
+    description: Object storage uploads
 paths:
   /healthz:
     get:
@@ -24,7 +32,638 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUploadUrlBody"
+      responses:
+        "200":
+          description: Upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestUploadUrlResponse"
+
+  /facesets:
+    get:
+      operationId: listFacesets
+      tags: [facesets]
+      summary: List facesets
+      responses:
+        "200":
+          description: List of facesets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  facesets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Faceset"
+                required: [facesets]
+    post:
+      operationId: createFaceset
+      tags: [facesets]
+      summary: Create a faceset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFacesetBody"
+      responses:
+        "201":
+          description: Faceset created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  faceset:
+                    $ref: "#/components/schemas/Faceset"
+                required: [faceset]
+
+  /facesets/{id}:
+    get:
+      operationId: getFaceset
+      tags: [facesets]
+      summary: Get a faceset with its images and faces
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Faceset detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  faceset:
+                    $ref: "#/components/schemas/Faceset"
+                  images:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FacesetImage"
+                  faces:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ExtractedFace"
+                required: [faceset, images, faces]
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateFaceset
+      tags: [facesets]
+      summary: Update a faceset
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFacesetBody"
+      responses:
+        "200":
+          description: Faceset updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  faceset:
+                    $ref: "#/components/schemas/Faceset"
+                required: [faceset]
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteFaceset
+      tags: [facesets]
+      summary: Delete a faceset
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /facesets/{id}/images:
+    post:
+      operationId: addFacesetImage
+      tags: [facesets]
+      summary: Register an uploaded image with a faceset
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddImageBody"
+      responses:
+        "201":
+          description: Image added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  image:
+                    $ref: "#/components/schemas/FacesetImage"
+                required: [image]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /facesets/{id}/images/{imageId}:
+    delete:
+      operationId: deleteFacesetImage
+      tags: [facesets]
+      summary: Delete a faceset image
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /facesets/{id}/extract:
+    post:
+      operationId: extractFacesetFaces
+      tags: [facesets]
+      summary: Kick off face extraction from faceset images
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Extraction queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  facesetId:
+                    type: string
+                  imageCount:
+                    type: number
+                required: [message, facesetId, imageCount]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /facesets/{id}/videos/extract-frames:
+    post:
+      operationId: extractVideoFrames
+      tags: [facesets]
+      summary: Extract frames from an uploaded video into faceset images
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractVideoFramesBody"
+      responses:
+        "201":
+          description: Frames extracted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  images:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FacesetImage"
+                required: [message, images]
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: No frames could be extracted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /models:
+    get:
+      operationId: listModels
+      tags: [models]
+      summary: List models
+      responses:
+        "200":
+          description: List of models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Model"
+                required: [models]
+    post:
+      operationId: createModel
+      tags: [models]
+      summary: Create a model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelBody"
+      responses:
+        "201":
+          description: Model created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model:
+                    $ref: "#/components/schemas/Model"
+                required: [model]
+
+  /models/{id}:
+    get:
+      operationId: getModel
+      tags: [models]
+      summary: Get a model with its faces
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Model detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model:
+                    $ref: "#/components/schemas/Model"
+                  faces:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ModelFace"
+                required: [model, faces]
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateModel
+      tags: [models]
+      summary: Update a model
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateModelBody"
+      responses:
+        "200":
+          description: Model updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model:
+                    $ref: "#/components/schemas/Model"
+                required: [model]
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteModel
+      tags: [models]
+      summary: Delete a model
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /models/{id}/faces:
+    post:
+      operationId: addModelFace
+      tags: [models]
+      summary: Add an uploaded face image to a model
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddModelFaceBody"
+      responses:
+        "201":
+          description: Face added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  face:
+                    $ref: "#/components/schemas/ModelFace"
+                required: [face]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /models/{id}/faces/{faceId}:
+    delete:
+      operationId: deleteModelFace
+      tags: [models]
+      summary: Delete a face from a model
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+        - name: faceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /models/{id}/train:
+    post:
+      operationId: trainModel
+      tags: [models]
+      summary: Start training a model
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainModelBody"
+      responses:
+        "200":
+          description: Training started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  modelId:
+                    type: string
+                  targetIterations:
+                    type: number
+                  batchSize:
+                    type: number
+                  saveInterval:
+                    type: number
+                required: [message, modelId, targetIterations, batchSize, saveInterval]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /models/{id}/train/cancel:
+    post:
+      operationId: cancelModelTraining
+      tags: [models]
+      summary: Cancel model training
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Training cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model:
+                    $ref: "#/components/schemas/Model"
+                  message:
+                    type: string
+                required: [model, message]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List jobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Job"
+                required: [jobs]
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Create a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJobBody"
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/Job"
+                  videoLimit:
+                    type:
+                      - object
+                      - "null"
+                    properties:
+                      maxSeconds:
+                        type: number
+                      label:
+                        type: string
+                required: [job]
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a job
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Job detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/Job"
+                required: [job]
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteJob
+      tags: [jobs]
+      summary: Delete a job
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /jobs/{id}/submit:
+    post:
+      operationId: submitJob
+      tags: [jobs]
+      summary: Submit a draft job to the queue
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Job submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/Job"
+                  message:
+                    type: string
+                required: [job, message]
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /jobs/{id}/cancel:
+    post:
+      operationId: cancelJob
+      tags: [jobs]
+      summary: Cancel a job
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Job cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: "#/components/schemas/Job"
+                  message:
+                    type: string
+                required: [job, message]
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
 components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +673,438 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required: [success]
+
+    RequestUploadUrlBody:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: number
+        contentType:
+          type: string
+      required: [name, size, contentType]
+
+    RequestUploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            size:
+              type: number
+            contentType:
+              type: string
+          required: [name, size, contentType]
+      required: [uploadURL, objectPath, metadata]
+
+    Faceset:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: [pending, extracting, ready, failed]
+        faceCount:
+          type: number
+        imageCount:
+          type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name, description, status, faceCount, imageCount, createdAt, updatedAt]
+
+    FacesetImage:
+      type: object
+      properties:
+        id:
+          type: string
+        facesetId:
+          type: string
+        filename:
+          type: string
+        originalName:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: number
+        width:
+          type:
+            - number
+            - "null"
+        height:
+          type:
+            - number
+            - "null"
+        facesExtracted:
+          type:
+            - number
+            - "null"
+        storageKey:
+          type: string
+        createdAt:
+          type: string
+      required: [id, facesetId, filename, originalName, mimeType, sizeBytes, storageKey, createdAt]
+
+    ExtractedFace:
+      type: object
+      properties:
+        id:
+          type: string
+        facesetId:
+          type: string
+        sourceImageId:
+          type:
+            - string
+            - "null"
+        storageKey:
+          type: string
+        confidence:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+      required: [id, facesetId, storageKey, createdAt]
+
+    CreateFacesetBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        description:
+          type: string
+          maxLength: 500
+      required: [name]
+
+    UpdateFacesetBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    AddImageBody:
+      type: object
+      properties:
+        filename:
+          type: string
+        originalName:
+          type: string
+        mimeType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        sizeBytes:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        storageKey:
+          type: string
+      required: [filename, originalName, mimeType, sizeBytes, storageKey]
+
+    ExtractVideoFramesBody:
+      type: object
+      properties:
+        objectPath:
+          type: string
+        maxFrames:
+          type: number
+          minimum: 1
+          maximum: 60
+        intervalSeconds:
+          type: number
+          minimum: 0.5
+          maximum: 10
+      required: [objectPath]
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: [untrained, queued, training, ready, failed]
+        resolution:
+          type: string
+          enum: ["128", "256"]
+        qualityPreset:
+          type: string
+          enum: [fast, balanced, high]
+        facesetId:
+          type:
+            - string
+            - "null"
+        iterations:
+          type: number
+        targetIterations:
+          type: number
+        currentLoss:
+          type:
+            - number
+            - "null"
+        checkpointKey:
+          type:
+            - string
+            - "null"
+        faceCount:
+          type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        trainedAt:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - name
+        - description
+        - status
+        - resolution
+        - qualityPreset
+        - facesetId
+        - iterations
+        - targetIterations
+        - currentLoss
+        - checkpointKey
+        - faceCount
+        - createdAt
+        - updatedAt
+        - trainedAt
+
+    ModelFace:
+      type: object
+      properties:
+        id:
+          type: string
+        modelId:
+          type: string
+        storageKey:
+          type: string
+        originalName:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+      required: [id, modelId, storageKey, createdAt]
+
+    CreateModelBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+        description:
+          type: string
+          maxLength: 500
+        facesetId:
+          type: string
+        qualityPreset:
+          type: string
+          enum: [fast, balanced, high]
+        resolution:
+          type: string
+          enum: ["128", "256"]
+        targetIterations:
+          type: number
+          minimum: 250
+          maximum: 6500
+      required: [name]
+
+    UpdateModelBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        facesetId:
+          type: string
+        qualityPreset:
+          type: string
+          enum: [fast, balanced, high]
+        resolution:
+          type: string
+          enum: ["128", "256"]
+        targetIterations:
+          type: number
+
+    AddModelFaceBody:
+      type: object
+      properties:
+        storageKey:
+          type: string
+        originalName:
+          type: string
+      required: [storageKey]
+
+    TrainModelBody:
+      type: object
+      properties:
+        iterations:
+          type: number
+          minimum: 250
+          maximum: 6500
+        saveInterval:
+          type: number
+          minimum: 100
+          maximum: 1000
+        batchSize:
+          type: number
+          minimum: 1
+          maximum: 8
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+            [
+              train_online,
+              train_device,
+              swap_video_small,
+              swap_video_medium,
+              swap_video_large,
+              swap_image,
+              upscale,
+            ]
+        status:
+          type: string
+          enum: [draft, queued, processing, completed, failed, cancelled]
+        modelId:
+          type:
+            - string
+            - "null"
+        facesetId:
+          type:
+            - string
+            - "null"
+        inputStorageKey:
+          type:
+            - string
+            - "null"
+        outputStorageKey:
+          type:
+            - string
+            - "null"
+        size:
+          type:
+            - string
+            - "null"
+          enum: [small, medium, large, null]
+        iterations:
+          type:
+            - number
+            - "null"
+        upscaleFactor:
+          type:
+            - number
+            - "null"
+        progressPercent:
+          type: number
+        errorMessage:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        completedAt:
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - type
+        - status
+        - modelId
+        - facesetId
+        - inputStorageKey
+        - outputStorageKey
+        - size
+        - iterations
+        - upscaleFactor
+        - progressPercent
+        - errorMessage
+        - createdAt
+        - updatedAt
+        - completedAt
+
+    CreateJobBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            [
+              train_online,
+              train_device,
+              swap_video_small,
+              swap_video_medium,
+              swap_video_large,
+              swap_image,
+              upscale,
+            ]
+        modelId:
+          type: string
+        facesetId:
+          type: string
+        inputStorageKey:
+          type: string
+        size:
+          type: string
+          enum: [small, medium, large]
+        iterations:
+          type: number
+        upscaleFactor:
+          type: number
+          minimum: 2
+          maximum: 4
+      required: [type]

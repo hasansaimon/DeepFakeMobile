@@ -5,7 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ModelFace } from './modelFace';
 
-export interface HealthStatus {
-  status: string;
-}
+export type AddModelFace201 = {
+  face: ModelFace;
+};

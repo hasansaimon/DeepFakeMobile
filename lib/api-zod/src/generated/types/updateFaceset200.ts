@@ -5,7 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Faceset } from './faceset';
 
-export interface HealthStatus {
-  status: string;
-}
+export type UpdateFaceset200 = {
+  faceset: Faceset;
+};

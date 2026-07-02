@@ -5,7 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Model } from './model';
 
-export interface HealthStatus {
-  status: string;
-}
+export type CancelModelTraining200 = {
+  model: Model;
+  message: string;
+};

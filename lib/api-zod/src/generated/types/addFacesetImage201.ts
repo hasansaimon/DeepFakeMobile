@@ -5,7 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FacesetImage } from './facesetImage';
 
-export interface HealthStatus {
-  status: string;
-}
+export type AddFacesetImage201 = {
+  image: FacesetImage;
+};
