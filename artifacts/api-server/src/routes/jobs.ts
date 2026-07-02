@@ -4,8 +4,11 @@ import { jobsTable, modelsTable, facesetsTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { upscaleMedia } from "../lib/upscale";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 
 const VIDEO_LIMITS: Record<string, { maxSeconds: number; label: string }> = {
   swap_video_small: { maxSeconds: 10, label: "first 10 seconds" },
@@ -21,13 +24,78 @@ const CreateJobBody = z.object({
     "swap_video_medium",
     "swap_video_large",
     "swap_image",
+    "upscale",
   ]),
   modelId: z.string().uuid().optional(),
   facesetId: z.string().uuid().optional(),
   inputStorageKey: z.string().optional(),
   size: z.enum(["small", "medium", "large"]).optional(),
   iterations: z.number().int().min(250).max(6500).optional(),
+  upscaleFactor: z.number().int().min(2).max(4).optional(),
 });
+
+async function runUpscaleJob(jobId: string, inputStorageKey: string, factor: number) {
+  try {
+    await db
+      .update(jobsTable)
+      .set({ status: "processing", progressPercent: 10, updatedAt: new Date() })
+      .where(eq(jobsTable.id, jobId));
+
+    const inputFile = await objectStorageService.getObjectEntityFile(inputStorageKey);
+    const [inputBuffer] = await inputFile.download();
+    const [metadata] = await inputFile.getMetadata();
+    const mimeType = (metadata.contentType as string) || "image/jpeg";
+
+    await db
+      .update(jobsTable)
+      .set({ progressPercent: 40, updatedAt: new Date() })
+      .where(eq(jobsTable.id, jobId));
+
+    const { buffer: outputBuffer, mimeType: outputMimeType } = await upscaleMedia(
+      inputBuffer,
+      mimeType,
+      factor,
+    );
+
+    await db
+      .update(jobsTable)
+      .set({ progressPercent: 80, updatedAt: new Date() })
+      .where(eq(jobsTable.id, jobId));
+
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const putRes = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": outputMimeType },
+      body: outputBuffer,
+    });
+    if (!putRes.ok) {
+      throw new Error(`Failed to upload upscaled output (status ${putRes.status})`);
+    }
+    const outputStorageKey = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+    await db
+      .update(jobsTable)
+      .set({
+        status: "completed",
+        progressPercent: 100,
+        outputStorageKey,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(jobsTable.id, jobId));
+  } catch (error) {
+    const message =
+      error instanceof ObjectNotFoundError
+        ? "Input file not found"
+        : error instanceof Error
+          ? error.message
+          : "Upscale failed";
+    await db
+      .update(jobsTable)
+      .set({ status: "failed", errorMessage: message, updatedAt: new Date() })
+      .where(eq(jobsTable.id, jobId));
+  }
+}
 
 router.get("/jobs", async (req, res) => {
   const { status, type } = req.query;
@@ -76,6 +144,11 @@ router.post("/jobs", async (req, res) => {
     return;
   }
 
+  if (body.data.type === "upscale" && !body.data.inputStorageKey) {
+    res.status(400).json({ error: "inputStorageKey is required for upscale jobs" });
+    return;
+  }
+
   const jobSize =
     body.data.size ??
     (body.data.type === "swap_video_small"
@@ -97,6 +170,7 @@ router.post("/jobs", async (req, res) => {
       inputStorageKey: body.data.inputStorageKey ?? null,
       size: jobSize ?? null,
       iterations: body.data.iterations ?? null,
+      upscaleFactor: body.data.type === "upscale" ? (body.data.upscaleFactor ?? 2) : null,
     })
     .returning();
 
@@ -133,9 +207,17 @@ router.post("/jobs/:id/submit", async (req, res) => {
     .set({ status: "queued", updatedAt: new Date() })
     .where(eq(jobsTable.id, req.params.id))
     .returning();
+
+  if (job.type === "upscale" && job.inputStorageKey) {
+    void runUpscaleJob(job.id, job.inputStorageKey, job.upscaleFactor ?? 2);
+  }
+
   res.json({
     job: updated,
-    message: "Job submitted to queue. You can monitor progress in the Jobs tab.",
+    message:
+      job.type === "upscale"
+        ? "Upscale job started and processing in the background."
+        : "Job submitted to queue. You can monitor progress in the Jobs tab.",
   });
 });
 

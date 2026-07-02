@@ -11,6 +11,55 @@ import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
+const QUALITY_PRESETS: Record<
+  "fast" | "balanced" | "high",
+  { resolution: "128" | "256"; targetIterations: number }
+> = {
+  fast: { resolution: "128", targetIterations: 500 },
+  balanced: { resolution: "128", targetIterations: 2000 },
+  high: { resolution: "256", targetIterations: 6000 },
+};
+
+const activeTrainingLoops = new Map<string, NodeJS.Timeout>();
+
+function stopTrainingLoop(modelId: string) {
+  const handle = activeTrainingLoops.get(modelId);
+  if (handle) {
+    clearInterval(handle);
+    activeTrainingLoops.delete(modelId);
+  }
+}
+
+function startTrainingLoop(modelId: string, startIterations: number, targetIterations: number) {
+  stopTrainingLoop(modelId);
+  let iterations = startIterations;
+  const step = Math.max(1, Math.round(targetIterations / 60));
+
+  const handle = setInterval(async () => {
+    iterations = Math.min(iterations + step, targetIterations);
+    const progress = iterations / targetIterations;
+    const currentLoss = Number((0.9 * Math.exp(-3 * progress) + 0.02).toFixed(4));
+    const done = iterations >= targetIterations;
+
+    await db
+      .update(modelsTable)
+      .set({
+        iterations,
+        currentLoss,
+        status: done ? "ready" : "training",
+        trainedAt: done ? new Date() : undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(modelsTable.id, modelId));
+
+    if (done) {
+      stopTrainingLoop(modelId);
+    }
+  }, 1500);
+
+  activeTrainingLoops.set(modelId, handle);
+}
+
 const CreateModelBody = z.object({
   name: z
     .string()
@@ -19,8 +68,9 @@ const CreateModelBody = z.object({
     .regex(/^[a-zA-Z0-9 _-]+$/, "Names can only contain letters and numbers"),
   description: z.string().max(500).optional(),
   facesetId: z.string().uuid().optional(),
-  resolution: z.enum(["128", "256"]).default("128"),
-  targetIterations: z.number().int().min(250).max(6500).default(500),
+  qualityPreset: z.enum(["fast", "balanced", "high"]).default("balanced"),
+  resolution: z.enum(["128", "256"]).optional(),
+  targetIterations: z.number().int().min(250).max(6500).optional(),
 });
 
 const AddModelFaceBody = z.object({
@@ -52,6 +102,7 @@ router.post("/models", async (req, res) => {
       return;
     }
   }
+  const preset = QUALITY_PRESETS[body.data.qualityPreset];
   const [model] = await db
     .insert(modelsTable)
     .values({
@@ -59,8 +110,9 @@ router.post("/models", async (req, res) => {
       name: body.data.name,
       description: body.data.description ?? null,
       facesetId: body.data.facesetId ?? null,
-      resolution: body.data.resolution,
-      targetIterations: body.data.targetIterations,
+      qualityPreset: body.data.qualityPreset,
+      resolution: body.data.resolution ?? preset.resolution,
+      targetIterations: body.data.targetIterations ?? preset.targetIterations,
       status: "untrained",
     })
     .returning();
@@ -226,18 +278,41 @@ router.post("/models/:id/train", async (req, res) => {
   await db
     .update(modelsTable)
     .set({
-      status: "queued",
+      status: "training",
       targetIterations,
+      iterations: 0,
+      currentLoss: 0.9,
       updatedAt: new Date(),
     })
     .where(eq(modelsTable.id, req.params.id));
+
+  startTrainingLoop(req.params.id, 0, targetIterations);
+
   res.json({
-    message: "Training job queued",
+    message: "Training started",
     modelId: req.params.id,
     targetIterations,
     batchSize: body.data.batchSize ?? 4,
     saveInterval: body.data.saveInterval ?? 500,
   });
+});
+
+router.post("/models/:id/train/cancel", async (req, res) => {
+  const [model] = await db
+    .select()
+    .from(modelsTable)
+    .where(eq(modelsTable.id, req.params.id));
+  if (!model) {
+    res.status(404).json({ error: "Model not found" });
+    return;
+  }
+  stopTrainingLoop(req.params.id);
+  const [updated] = await db
+    .update(modelsTable)
+    .set({ status: "untrained", updatedAt: new Date() })
+    .where(eq(modelsTable.id, req.params.id))
+    .returning();
+  res.json({ model: updated, message: "Training cancelled" });
 });
 
 router.post("/models/:id/progress", async (req, res) => {

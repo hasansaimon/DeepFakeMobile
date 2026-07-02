@@ -11,6 +11,7 @@ export const jobTypeEnum = pgEnum("job_type", [
   "swap_video_medium",
   "swap_video_large",
   "swap_image",
+  "upscale",
 ]);
 
 export const jobStatusEnum = pgEnum("job_status", [
@@ -38,6 +39,7 @@ export const jobsTable = pgTable("jobs", {
   outputStorageKey: text("output_storage_key"),
   size: jobSizeEnum("size"),
   iterations: integer("iterations"),
+  upscaleFactor: integer("upscale_factor"),
   progressPercent: integer("progress_percent").notNull().default(0),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { facesetsTable } from "./facesets";
@@ -13,17 +13,25 @@ export const modelStatusEnum = pgEnum("model_status", [
 
 export const modelResolutionEnum = pgEnum("model_resolution", ["128", "256"]);
 
+export const modelQualityPresetEnum = pgEnum("model_quality_preset", [
+  "fast",
+  "balanced",
+  "high",
+]);
+
 export const modelsTable = pgTable("models", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   status: modelStatusEnum("status").notNull().default("untrained"),
   resolution: modelResolutionEnum("resolution").notNull().default("128"),
+  qualityPreset: modelQualityPresetEnum("quality_preset").notNull().default("balanced"),
   facesetId: text("faceset_id").references(() => facesetsTable.id, {
     onDelete: "set null",
   }),
   iterations: integer("iterations").notNull().default(0),
   targetIterations: integer("target_iterations").notNull().default(500),
+  currentLoss: real("current_loss"),
   checkpointKey: text("checkpoint_key"),
   faceCount: integer("face_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
