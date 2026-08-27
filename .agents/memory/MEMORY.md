@@ -1,0 +1,1 @@
+- [Generated API exports](generated-api-exports.md) — Orval's generated schema barrel can collide when both generated modules are re-exported.

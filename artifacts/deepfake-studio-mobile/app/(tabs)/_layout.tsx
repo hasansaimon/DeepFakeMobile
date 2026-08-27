@@ -20,6 +20,18 @@ function NativeTabLayout() {
         <Icon sf={{ default: "house", selected: "house.fill" }} />
         <Label>Home</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="models">
+        <Icon sf={{ default: "wand.and.stars", selected: "wand.and.stars" }} />
+        <Label>Models</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="library">
+        <Icon sf={{ default: "photo.on.rectangle", selected: "photo.fill" }} />
+        <Label>Library</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="activity">
+        <Icon sf={{ default: "clock", selected: "clock.fill" }} />
+        <Label>Activity</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -36,7 +48,7 @@ function ClassicTabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: true,
+         headerShown: false,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.background,
@@ -71,6 +83,42 @@ function ClassicTabLayout() {
               <SymbolView name="house" tintColor={color} size={24} />
             ) : (
               <Feather name="home" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="models"
+        options={{
+          title: "Models",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="wand.and.stars" tintColor={color} size={24} />
+            ) : (
+              <Feather name="aperture" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="library"
+        options={{
+          title: "Library",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="photo.on.rectangle" tintColor={color} size={24} />
+            ) : (
+              <Feather name="image" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          title: "Activity",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="clock" tintColor={color} size={24} />
+            ) : (
+              <Feather name="clock" size={22} color={color} />
             ),
         }}
       />
