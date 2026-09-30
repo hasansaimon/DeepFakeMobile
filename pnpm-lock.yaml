@@ -181,6 +181,11 @@ overrides:
   rollup>@rollup/rollup-win32-x64-gnu: '-'
   rollup>@rollup/rollup-win32-x64-msvc: '-'
 
+patchedDependencies:
+  metro@0.83.3:
+    hash: 53945de0633ffd7e1820b0666a974843e7c941b56c36709134b51426d5cfcebb
+    path: patches/metro@0.83.3.patch
+
 importers:
 
   .:
@@ -6999,7 +7004,7 @@ snapshots:
 
   '@expo/metro@54.2.0':
     dependencies:
-      metro: 0.83.3
+      metro: 0.83.3(patch_hash=53945de0633ffd7e1820b0666a974843e7c941b56c36709134b51426d5cfcebb)
       metro-babel-transformer: 0.83.3
       metro-cache: 0.83.3
       metro-cache-key: 0.83.3
@@ -10580,7 +10585,7 @@ snapshots:
       connect: 3.7.0
       flow-enums-runtime: 0.0.6
       jest-validate: 29.7.0
-      metro: 0.83.3
+      metro: 0.83.3(patch_hash=53945de0633ffd7e1820b0666a974843e7c941b56c36709134b51426d5cfcebb)
       metro-cache: 0.83.3
       metro-core: 0.83.3
       metro-runtime: 0.83.3
@@ -10753,7 +10758,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@babel/types': 7.29.7
       flow-enums-runtime: 0.0.6
-      metro: 0.83.3
+      metro: 0.83.3(patch_hash=53945de0633ffd7e1820b0666a974843e7c941b56c36709134b51426d5cfcebb)
       metro-babel-transformer: 0.83.3
       metro-cache: 0.83.3
       metro-cache-key: 0.83.3
@@ -10786,7 +10791,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  metro@0.83.3:
+  metro@0.83.3(patch_hash=53945de0633ffd7e1820b0666a974843e7c941b56c36709134b51426d5cfcebb):
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7

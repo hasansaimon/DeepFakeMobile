@@ -36,6 +36,9 @@ minimumReleaseAgeExclude:
   - '@replit/*'
   - stripe-replit-sync
 
+patchedDependencies:
+  metro@0.83.3: patches/metro@0.83.3.patch
+
 onlyBuiltDependencies:
   - '@swc/core'
   - esbuild

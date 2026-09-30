@@ -1,1 +1,2 @@
 - [Generated API exports](generated-api-exports.md) — Orval's generated schema barrel can collide when both generated modules are re-exported.
+- [Expo Metro image sizing](expo-metro-image-size.md) — Expo 54's Metro path API needs an adapter when image-size is securely overridden to 2.x.
